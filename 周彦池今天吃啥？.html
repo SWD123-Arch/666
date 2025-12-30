@@ -21,6 +21,7 @@
             --light-color: #F8F9FF;
             --dark-color: #2C2C54;
             --success-color: #4CAF50;
+            --danger-color: #F44336;
             --shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
             --transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
@@ -397,6 +398,36 @@
             color: var(--primary-color);
         }
         
+        /* 删除按钮 */
+        .delete-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--danger-color);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            cursor: pointer;
+            opacity: 0;
+            transition: var(--transition);
+            border: none;
+            z-index: 10;
+        }
+        
+        .food-item:hover .delete-btn {
+            opacity: 1;
+        }
+        
+        .delete-btn:hover {
+            transform: scale(1.1);
+            background: #d32f2f;
+        }
+        
         .counter {
             display: flex;
             justify-content: center;
@@ -688,6 +719,38 @@
             display: block;
             animation: fadeInUp 0.5s ease;
         }
+
+        /* 删除确认弹窗 */
+        .delete-popup .popup-content {
+            max-width: 450px;
+        }
+
+        .delete-warning {
+            font-size: 5rem;
+            margin-bottom: 20px;
+            color: var(--danger-color);
+        }
+
+        .delete-text {
+            font-size: 1.3rem;
+            margin-bottom: 30px;
+            color: var(--dark-color);
+        }
+
+        .delete-buttons {
+            display: flex;
+            gap: 15px;
+        }
+
+        .delete-confirm {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .delete-cancel {
+            background: #f5f5f5;
+            color: var(--dark-color);
+        }
     </style>
 </head>
 <body>
@@ -720,8 +783,22 @@
                     <button type="button" class="form-btn cancel-btn" id="cancelAdd">取消</button>
                     <button type="submit" class="form-btn submit-btn" id="submitAdd">添加</button>
                 </div>
-                <div class="success-tip" id="successTip">添加成功！🎉</div>
+                <div class="success-tip" id="successTip">添加成功！🎉🎉</div>
             </form>
+        </div>
+    </div>
+
+    <!-- 删除确认弹窗 -->
+    <div class="popup-overlay delete-popup" id="deletePopup">
+        <div class="popup-content">
+            <div class="delete-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="delete-text" id="deleteText">确定要删除这个美食吗？</div>
+            <div class="delete-buttons">
+                <button class="form-btn delete-cancel" id="cancelDelete">取消</button>
+                <button class="form-btn delete-confirm" id="confirmDelete">确定删除</button>
+            </div>
         </div>
     </div>
 
@@ -742,14 +819,14 @@
                 <!-- 抽签动画区域 -->
                 <div class="lottery-wheel" id="lotteryWheel">
                     <div class="wheel-content" id="wheelContent">
-                        <div class="wheel-item" id="wheelItem">准备抽签...</div>
+                        <div class="wheel-item" id="wheelItem">看看吃啥...</div>
                     </div>
                 </div>
                 
                 <!-- 结果显示区域 -->
                 <div class="result-display" id="resultDisplay">
                     <div class="food-category" id="resultCategory">主食类</div>
-                    <div class="food-result" id="resultName">螺蛳粉</div>
+                    <div class="food-result" id="resultName">螺蛳蛳粉</div>
                     <div class="food-desc" id="resultDesc">点击下方按钮开始抽签！</div>
                 </div>
             </div>
@@ -791,15 +868,15 @@
     </button>
 
     <script>
-        // 美食数据
-        const foodData = [
+        // 默认美食数据
+        const defaultFoodData = [
             { name: "鱼粉", category: "主食类", desc: "鲜美鱼汤搭配细腻米粉" },
             { name: "荤豆花", category: "主食类", desc: "嫩滑豆花搭配丰富配料" },
-            { name: "螺蛳粉", category: "主食类", desc: "酸辣鲜香的地方特色" },
+            { name: "螺蛳蛳粉", category: "主食类", desc: "酸辣鲜香的地方特色" },
             { name: "新疆炒米粉", category: "主食类", desc: "香辣浓郁的新疆风味" },
             { name: "牛肉面", category: "主食类", desc: "汤鲜味美的经典面食" },
             { name: "酸辣粉儿", category: "主食类", desc: "酸辣开胃的街头小吃" },
-            { name: "馄饨", category: "主食类", desc: "皮薄馅嫩的温暖美食" },
+            { name: "馄馄饨饨", category: "主食类", desc: "皮薄馅嫩的温暖美食" },
             { name: "肠粉", category: "主食类", desc: "滑嫩爽口的广式早点" },
             { name: "鸡腿饭", category: "主食类", desc: "香酥鸡腿搭配米饭" },
             { name: "卤肉饭", category: "主食类", desc: "台式经典卤肉饭" },
@@ -852,6 +929,26 @@
             { name: "零食有鸣的友友", category: "其他", desc: "零食店选购" }
         ];
 
+        // 从localStorage加载数据，如果没有则使用默认数据
+        function loadFoodData() {
+            const savedData = localStorage.getItem('foodData');
+            if (savedData) {
+                return JSON.parse(savedData);
+            } else {
+                // 首次使用，保存默认数据到localStorage
+                saveFoodData(defaultFoodData);
+                return defaultFoodData;
+            }
+        }
+
+        // 保存数据到localStorage
+        function saveFoodData(data) {
+            localStorage.setItem('foodData', JSON.stringify(data));
+        }
+
+        // 美食数据
+        let foodData = loadFoodData();
+        
         // 弹窗文本列表
         const popupTexts = [
             "周彦池又不知道吃啥啦",
@@ -889,6 +986,11 @@
         const foodDescInput = document.getElementById('foodDesc');
         const cancelAddBtn = document.getElementById('cancelAdd');
         const successTip = document.getElementById('successTip');
+        // 删除弹窗元素
+        const deletePopup = document.getElementById('deletePopup');
+        const deleteText = document.getElementById('deleteText');
+        const cancelDeleteBtn = document.getElementById('cancelDelete');
+        const confirmDeleteBtn = document.getElementById('confirmDelete');
         
         // 状态变量
         let currentSelectedFood = null;
@@ -898,6 +1000,7 @@
         let spinSpeed = 50; // 初始速度（毫秒）
         let spinItems = [];
         let finalIndex = 0;
+        let foodToDelete = null;
         
         // 初始化页面
         function init() {
@@ -937,6 +1040,14 @@
                 foodForm.reset();
                 successTip.classList.remove('show');
             });
+
+            // 绑定删除弹窗事件
+            cancelDeleteBtn.addEventListener('click', () => {
+                deletePopup.classList.remove('show');
+                foodToDelete = null;
+            });
+
+            confirmDeleteBtn.addEventListener('click', deleteFood);
         }
 
         // 显示欢迎弹窗
@@ -963,6 +1074,12 @@
                 return;
             }
 
+            // 检查是否已存在相同名称的美食
+            if (foodData.some(food => food.name === name)) {
+                alert('已存在相同名称的美食！');
+                return;
+            }
+
             // 添加到数据数组
             const newFood = { name, category, desc };
             foodData.push(newFood);
@@ -977,6 +1094,9 @@
             renderFoodGrid();
             totalCountElement.textContent = foodData.length;
 
+            // 保存到localStorage
+            saveFoodData(foodData);
+
             // 重置表单并显示提示
             foodForm.reset();
             successTip.classList.add('show');
@@ -986,6 +1106,44 @@
                 addFoodPopup.classList.remove('show');
                 successTip.classList.remove('show');
             }, 1500);
+        }
+
+        // 删除菜品
+        function deleteFood() {
+            if (!foodToDelete) return;
+            
+            // 从数据数组中删除
+            const index = foodData.findIndex(food => food.name === foodToDelete.name);
+            if (index !== -1) {
+                foodData.splice(index, 1);
+                
+                // 保存到localStorage
+                saveFoodData(foodData);
+                
+                // 更新分类列表
+                categories = [...new Set(foodData.map(food => food.category))];
+                
+                // 更新美食列表和总数
+                renderCategoryFilter();
+                renderFoodGrid();
+                totalCountElement.textContent = foodData.length;
+                
+                // 如果删除的是当前选中的菜品，重置选择
+                if (currentSelectedFood && currentSelectedFood.name === foodToDelete.name) {
+                    resetSelection();
+                }
+                
+                // 关闭删除弹窗
+                deletePopup.classList.remove('show');
+                foodToDelete = null;
+            }
+        }
+
+        // 显示删除确认弹窗
+        function showDeletePopup(food) {
+            foodToDelete = food;
+            deleteText.textContent = `确定要删除 "${food.name}" 吗？`;
+            deletePopup.classList.add('show');
         }
         
         // 生成分类筛选按钮
@@ -1058,10 +1216,23 @@
                 
                 foodItem.innerHTML = `
                     <div class="food-name">${food.name}</div>
+                    <button class="delete-btn" title="删除菜品">
+                        <i class="fas fa-times"></i>
+                    </button>
                 `;
                 
-                foodItem.addEventListener('click', () => {
-                    selectFood(food);
+                foodItem.addEventListener('click', (e) => {
+                    // 防止点击删除按钮时触发选择
+                    if (!e.target.closest('.delete-btn')) {
+                        selectFood(food);
+                    }
+                });
+                
+                // 添加删除按钮事件
+                const deleteBtn = foodItem.querySelector('.delete-btn');
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // 阻止事件冒泡
+                    showDeletePopup(food);
                 });
                 
                 foodGrid.appendChild(foodItem);
@@ -1078,7 +1249,7 @@
             }
             
             // 显示初始内容
-            wheelItem.textContent = "点击开始抽签";
+            wheelItem.textContent = "看看吃啥";
         }
         
         // 开始抽签动画
@@ -1087,7 +1258,7 @@
             
             isSpinning = true;
             randomBtn.disabled = true;
-            randomBtn.innerHTML = '<i class="fas fa-spinner loading"></i> 抽签中...';
+            randomBtn.innerHTML = '<i class="fas fa-spinner loading"></i> 看看吃啥...';
             
             // 隐藏结果区域
             resultDisplay.classList.remove('show');
@@ -1151,7 +1322,7 @@
         function stopLottery(food) {
             isSpinning = false;
             randomBtn.disabled = false;
-            randomBtn.innerHTML = '<i class="fas fa-random"></i> 开始抽签';
+            randomBtn.innerHTML = '<i class="fas fa-random"></i> 看看吃啥';
             
             // 显示最终结果
             if (food) {
